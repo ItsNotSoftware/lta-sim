@@ -1,5 +1,14 @@
 import pygame
-import sys
+import numpy as np
+from car import Car
+from enum import Enum, auto
+
+
+class Event(Enum):
+    QUIT = auto()
+    SW_LEFT = auto()
+    SW_RIGHT = auto()
+    NO_EVENT = auto()
 
 
 class Color:
@@ -10,29 +19,35 @@ class Color:
 
 
 class UI:
-    def __init__(self, width: int, height: int) -> None:
-        pygame.init()
+    def __init__(self, width: int, height: int, fps: int) -> None:
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((width, height))
-        self.car = pygame.transform.rotate(pygame.image.load("car.png"), -90)
         self.width = width
         self.height = height
+        self.fps = fps
 
-    def event_handler(self) -> None:
+    def event_handler(self) -> Event:
+        keys = pygame.key.get_pressed()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                return Event.QUIT
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:
+                    return Event.QUIT
 
-        # Keyboard input
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-            print("Left")
-        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            print("Right")
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            return Event.SW_LEFT
+        elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            return Event.SW_RIGHT
 
-    def _draw_img(self, img: pygame.Surface, x: int, y: int) -> None:
-        self.screen.blit(img, (x - img.get_width() // 2, y - img.get_height() // 2))
+        return Event.NO_EVENT
+
+    def _draw_img(
+        self, img: pygame.Surface, x: int, y: int, orientation: float
+    ) -> None:
+        rotated_img = pygame.transform.rotate(img, -np.degrees(orientation))
+        rect = rotated_img.get_rect(center=(x, y))
+        self.screen.blit(rotated_img, rect.topleft)
 
     def draw_road(self) -> None:
         # Draw grass on both sides
@@ -56,11 +71,9 @@ class UI:
             x = grass_width + i * lane_width
             pygame.draw.line(self.screen, Color.WHITE, (x, 0), (x, self.height), 5)
 
-    def draw(self) -> None:
-        self.screen.fill(Color.WHITE)
-
+    def draw(self, car: Car) -> None:
         self.draw_road()
-        self._draw_img(self.car, self.width // 2, self.height // 1.5)  
+        self._draw_img(car.image, car.x, self.height // 2, -car.orientation)
 
         pygame.display.flip()
-        self.clock.tick(60)
+        self.clock.tick(self.fps)
