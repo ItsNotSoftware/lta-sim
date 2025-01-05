@@ -3,10 +3,15 @@ import numpy as np
 
 
 class Car:
-    def __init__(self, x: int, y: int) -> None:
+    def __init__(self, x: int, y: int, pixels_per_m: int, lanes: np.ndarray) -> None:
         self.image = pygame.image.load("car.png")
-        self.wheel_base = 2.9  # Wheelbase 
+        self.wheel_base = 2.9  # Wheelbase
         self.state = np.array([x, y, np.pi / 2, 0.0])
+        self.lanes = lanes
+        self.pixels_per_m = pixels_per_m
+
+        # Car width in meters (using image height because image is rotated)
+        self.width = self.image.get_height() / pixels_per_m
 
     @property
     def x(self) -> float:
@@ -38,15 +43,29 @@ class Car:
                 [0, 1],
             ]
         )
-        print(f"u: {u}\n")
 
         return A @ u
 
-    def integrate_kinematics(self, d_state: np.ndarray, dt: float) -> None:
+    def integrate_kinematics(
+        self, d_state: np.ndarray, dt: float
+    ) -> tuple[float, float]:
+        half_width = self.width / 2
         self.state += d_state * dt
 
         # Constrain steering angle to be between -pi/4 and pi/4
         self.state[3] = np.clip(self.state[3], -np.pi / 4, np.pi / 4)
+
+        # return dist in x to left and right lane
+        dist = self.lanes - self.x
+
+        try:
+            left_dist = dist[1] + half_width
+            right_dist = dist[2] - half_width
+        except ValueError:
+            left_dist = 0.0
+            right_dist = 0.0
+
+        return float(-left_dist), float(right_dist)
 
     def draw(self, screen: pygame.Surface) -> None:
         rotated_image = pygame.transform.rotate(self.image, np.degrees(self.theta))
