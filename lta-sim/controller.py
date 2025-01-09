@@ -22,7 +22,7 @@ class Controller:
         self.u = 0
 
     def compute_steering(self, target: float, current: float, dt: float) -> float:
-        error = current - target
+        error = target - current
         self.integral += error * dt
         self.integral = np.clip(self.integral, -self.anti_windup, self.anti_windup)
 

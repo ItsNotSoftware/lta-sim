@@ -35,8 +35,7 @@ def publish_car_state(
     turn_rate: float,
     target: float,
     car: Car,
-    st_pos_cnt: Controller,
-    st_w_cnt: Controller,
+    controller: Controller,
 ) -> None:
     """Publish the car's state in JSON format."""
 
@@ -61,21 +60,13 @@ def publish_car_state(
             "car_theta": to_serializable(car.orientation),
             "steering_angle": to_serializable(car.steering_angle),
             "car_theta": to_serializable(0),
-            "st_pos_controller": {
-                "P": to_serializable(st_pos_cnt.P),
-                "I": to_serializable(st_pos_cnt.I),
-                "D": to_serializable(st_pos_cnt.D),
-                "error": to_serializable(st_pos_cnt.prev_error),
-                "integral": to_serializable(st_pos_cnt.integral),
-                "u": to_serializable(st_pos_cnt.u),
-            },
-            "st_w_controller": {
-                "P": to_serializable(st_w_cnt.P),
-                "I": to_serializable(st_w_cnt.I),
-                "D": to_serializable(st_w_cnt.D),
-                "error": to_serializable(st_w_cnt.prev_error),
-                "integral": to_serializable(st_w_cnt.integral),
-                "u": to_serializable(st_w_cnt.u),
+            "controller": {
+                "P": to_serializable(controller.P),
+                "I": to_serializable(controller.I),
+                "D": to_serializable(controller.D),
+                "error": to_serializable(controller.prev_error),
+                "integral": to_serializable(controller.integral),
+                "u": to_serializable(controller.u),
             },
         },
     }
@@ -90,29 +81,29 @@ def main() -> None:
     lanes = np.array(ui.lanes) / PIXELS_PER_METER
     center_line = (lanes[2] + lanes[1]) / 2
     car = Car(
-        SCREEN_WIDTH / (2 * PIXELS_PER_METER) + 5,
+        SCREEN_WIDTH / (2 * PIXELS_PER_METER),
         SCREEN_HEIGHT / (2 * PIXELS_PER_METER),
         PIXELS_PER_METER,
         lanes,
     )
-    st_pos_controller = Controller(0.2, 0.03, 0.1, np.pi / 3, np.pi / 3)
-    st_w_controller = Controller(0.01, 0.001, 0.05, np.pi, np.pi)
+    controller = Controller(0.2, 0.03, 0.1, np.pi / 3, np.pi / 3)
 
     sock, address = setup_udp_socket(UDP_IP, UDP_PORT)
     pygame.init()
     prev_time = time.time()
-    lock = True
+    tick_count = 0
 
     while True:
         event = ui.event_handler()
-
         match event:
             case Event.QUIT:
                 break
             case Event.SW_LEFT:
                 u = np.array([CAR_SPEED, SW_TURN_SPEED]).astype(np.float64)
+                tick_count = 0
             case Event.SW_RIGHT:
                 u = np.array([CAR_SPEED, -SW_TURN_SPEED]).astype(np.float64)
+                tick_count = 0
             case Event.NO_EVENT:
                 u = np.array([CAR_SPEED, 0]).astype(np.float64)
 
@@ -120,11 +111,13 @@ def main() -> None:
         dt = timestamp - prev_time
         prev_time = timestamp
 
-        # Add controller output to steering angle
-        u_theta = st_pos_controller.compute_steering(center_line, car.x, dt)
-        u_ws = st_w_controller.compute_steering(u_theta, car.orientation, dt)
-        u[1] += u_ws
-
+        # Disable controller if player is steering for 1/8s  
+        if tick_count > FPS / 8:
+            # PID to get target steering angle
+            target_phi = controller.compute_steering(car.x, center_line, dt)
+            
+            # Feedforward to calculate target turn rate to reach target steering angleS
+            u[1] = (target_phi - car.steering_angle) / dt
 
         # Calculate car dynamics
         d_state = car.kinematics_model(u)
@@ -140,12 +133,12 @@ def main() -> None:
             u[1],
             center_line,
             car,
-            st_pos_controller,
-            st_w_controller,
+            controller,
         )
 
         # Draw UI
         ui.draw(car)
+        tick_count += 1
 
     pygame.quit()
     sock.close()
