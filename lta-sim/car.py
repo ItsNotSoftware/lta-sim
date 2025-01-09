@@ -52,8 +52,8 @@ class Car:
         half_width = self.width / 2
         self.state += d_state * dt
 
-        # Constrain steering angle to be between -pi/4 and pi/4
-        self.state[3] = np.clip(self.state[3], -np.pi / 4, np.pi / 4)
+        # Constrain steering angle to be between -pi/3 and pi/3
+        self.state[3] = np.clip(self.state[3], -np.pi / 3, np.pi / 3)
 
         # return dist in x to left and right lane
         dist = self.lanes - self.x

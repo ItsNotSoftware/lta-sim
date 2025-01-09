@@ -13,6 +13,7 @@ class Event(Enum):
     QUIT = auto()
     SW_LEFT = auto()
     SW_RIGHT = auto()
+    LOCK = auto()
     NO_EVENT = auto()
 
 
@@ -50,6 +51,8 @@ class UI:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q:
                     return Event.QUIT
+                if event.key == pygame.K_l:
+                    return Event.LOCK
 
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             return Event.SW_LEFT

@@ -1,31 +1,45 @@
 from ui import UI, Event, PIXELS_PER_METER
 from car import Car
+from controller import Controller
 
 import numpy as np
 import pygame
 import socket
-import json 
+import json
+import time
 
 # Constants
 SCREEN_WIDTH = 1400
 SCREEN_HEIGHT = 1600
-CAR_SPEED = 12  # m/s
+CAR_SPEED = 10  # m/s
 SW_TURN_SPEED = np.pi / 4  # rad/s
 FPS = 60
-DT = 1 / FPS
-UDP_IP = "127.0.0.1"  # Replace with PlotJuggler's IP if remote
+UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
 
 
-def setup_udp_socket(ip: str, port: int):
+def setup_udp_socket(ip: str, port: int) -> tuple[socket.socket, tuple]:
     """Setup the UDP socket."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     address = (ip, port)
     return sock, address
 
 
-def publish_car_state(sock: socket.socket, address: tuple, timestamp: float, left_dist: float, right_dist: float, car_speed: float, turn_rate: float) -> None:
+def publish_car_state(
+    sock: socket.socket,
+    address: tuple,
+    timestamp: float,
+    left_dist: float,
+    right_dist: float,
+    car_speed: float,
+    turn_rate: float,
+    target: float,
+    car: Car,
+    st_pos_cnt: Controller,
+    st_w_cnt: Controller,
+) -> None:
     """Publish the car's state in JSON format."""
+
     def to_serializable(value):
         """Convert a value to a JSON-serializable Python type."""
         if isinstance(value, (np.integer, np.floating)):
@@ -42,6 +56,27 @@ def publish_car_state(sock: socket.socket, address: tuple, timestamp: float, lef
             "right_distance": to_serializable(right_dist),
             "car_speed": to_serializable(car_speed),
             "turn_rate": to_serializable(turn_rate),
+            "target": to_serializable(target),
+            "car_x": to_serializable(car.x),
+            "car_theta": to_serializable(car.orientation),
+            "steering_angle": to_serializable(car.steering_angle),
+            "car_theta": to_serializable(0),
+            "st_pos_controller": {
+                "P": to_serializable(st_pos_cnt.P),
+                "I": to_serializable(st_pos_cnt.I),
+                "D": to_serializable(st_pos_cnt.D),
+                "error": to_serializable(st_pos_cnt.prev_error),
+                "integral": to_serializable(st_pos_cnt.integral),
+                "u": to_serializable(st_pos_cnt.u),
+            },
+            "st_w_controller": {
+                "P": to_serializable(st_w_cnt.P),
+                "I": to_serializable(st_w_cnt.I),
+                "D": to_serializable(st_w_cnt.D),
+                "error": to_serializable(st_w_cnt.prev_error),
+                "integral": to_serializable(st_w_cnt.integral),
+                "u": to_serializable(st_w_cnt.u),
+            },
         },
     }
 
@@ -51,45 +86,69 @@ def publish_car_state(sock: socket.socket, address: tuple, timestamp: float, lef
 
 
 def main() -> None:
-    # UI and Car setup
     ui = UI(SCREEN_WIDTH, SCREEN_HEIGHT, CAR_SPEED, FPS)
+    lanes = np.array(ui.lanes) / PIXELS_PER_METER
+    center_line = (lanes[2] + lanes[1]) / 2
     car = Car(
-        SCREEN_WIDTH / (2 * PIXELS_PER_METER),
+        SCREEN_WIDTH / (2 * PIXELS_PER_METER) + 5,
         SCREEN_HEIGHT / (2 * PIXELS_PER_METER),
         PIXELS_PER_METER,
-        np.array(ui.lanes) / PIXELS_PER_METER,
+        lanes,
     )
+    st_pos_controller = Controller(0.2, 0.03, 0.1, np.pi / 3, np.pi / 3)
+    st_w_controller = Controller(0.01, 0.001, 0.05, np.pi, np.pi)
 
     sock, address = setup_udp_socket(UDP_IP, UDP_PORT)
     pygame.init()
+    prev_time = time.time()
+    lock = True
 
-    try:
-        while True:
-            event = ui.event_handler()
+    while True:
+        event = ui.event_handler()
 
-            match event:
-                case Event.QUIT:
-                    break
-                case Event.SW_LEFT:
-                    u = np.array([CAR_SPEED, SW_TURN_SPEED])
-                case Event.SW_RIGHT:
-                    u = np.array([CAR_SPEED, -SW_TURN_SPEED])
-                case Event.NO_EVENT:
-                    u = np.array([CAR_SPEED, 0])
+        match event:
+            case Event.QUIT:
+                break
+            case Event.SW_LEFT:
+                u = np.array([CAR_SPEED, SW_TURN_SPEED]).astype(np.float64)
+            case Event.SW_RIGHT:
+                u = np.array([CAR_SPEED, -SW_TURN_SPEED]).astype(np.float64)
+            case Event.NO_EVENT:
+                u = np.array([CAR_SPEED, 0]).astype(np.float64)
 
-            # Calculate car dynamics
-            d_state = car.kinematics_model(u)
-            left_dist, right_dist = car.integrate_kinematics(d_state, DT)
+        timestamp = time.time()
+        dt = timestamp - prev_time
+        prev_time = timestamp
 
-            timestamp = pygame.time.get_ticks() / 1000.0  # Convert ms to seconds
-            publish_car_state(sock, address, timestamp, left_dist, right_dist, CAR_SPEED, u[1])
+        # Add controller output to steering angle
+        u_theta = st_pos_controller.compute_steering(center_line, car.x, dt)
+        u_ws = st_w_controller.compute_steering(u_theta, car.orientation, dt)
+        u[1] += u_ws
 
-            # Draw UI
-            ui.draw(car)
 
-    finally:
-        pygame.quit()
-        sock.close()
+        # Calculate car dynamics
+        d_state = car.kinematics_model(u)
+        left_dist, right_dist = car.integrate_kinematics(d_state, dt)
+
+        publish_car_state(
+            sock,
+            address,
+            timestamp * 1000,
+            left_dist,
+            right_dist,
+            CAR_SPEED,
+            u[1],
+            center_line,
+            car,
+            st_pos_controller,
+            st_w_controller,
+        )
+
+        # Draw UI
+        ui.draw(car)
+
+    pygame.quit()
+    sock.close()
 
 
 if __name__ == "__main__":
