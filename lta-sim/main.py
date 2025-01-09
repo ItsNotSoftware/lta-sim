@@ -139,10 +139,10 @@ def main() -> None:
         # Draw UI
         ui.draw(car)
         tick_count += 1
+        car.lanes = np.array(ui.lanes) / PIXELS_PER_METER
 
     pygame.quit()
     sock.close()
-
 
 if __name__ == "__main__":
     main()
