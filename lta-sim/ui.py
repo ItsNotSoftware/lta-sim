@@ -33,15 +33,16 @@ class UI:
         self.speed = speed * PIXELS_PER_METER
         self.fps = fps
         self.lanes = self.init_lanes(width)
+        self.current_lanes = self.lanes
         self.dash_offset = 0
 
     @staticmethod
-    def init_lanes(width) -> None:
+    def init_lanes(width) -> np.ndarray:
         grass_width = width // 6
         road_width = width - 2 * grass_width
         lane_width = road_width // 3
         lanes = [grass_width + i * lane_width for i in range(4)]
-        return lanes
+        return np.array(lanes)
 
     def event_handler(self) -> Event:
         keys = pygame.key.get_pressed()
@@ -68,7 +69,7 @@ class UI:
         rect = rotated_img.get_rect(center=(x, y))
         self.screen.blit(rotated_img, rect.topleft)
 
-    def draw_road(self, theta: float, time: float) -> None:
+    def draw_road(self, theta: float, time: float, car_y: int) -> None:
         # Draw grass on both sides
         grass_width = self.width // 6
         pygame.draw.rect(self.screen, Color.ROAD, (0, 0, grass_width, self.height))
@@ -92,8 +93,8 @@ class UI:
         self.dash_offset %= total_dash_height
 
         # Define the sinusoidal curve effect
-        curve_amplitude = grass_width // 2  # Maximum horizontal deviation for the curve
-        curve_frequency = 0.002  # Controls the density of curves
+        curve_amplitude = grass_width // 2.2  # Maximum horizontal deviation for the curve
+        curve_frequency = 0.001  # Controls the density of curves
 
         def road_curve(y):
             """Calculate the horizontal offset of the road at a given y-coordinate."""
@@ -132,14 +133,15 @@ class UI:
                     (right_x + 1, y),
                     LANE_WIDTH,
                 )
+        self.current_lanes = self.lanes + road_curve(car_y) 
         
-
 
     def draw(self, car: Car) -> None:
         current_time = pygame.time.get_ticks() / 1000  # Get time in seconds
-        self.draw_road(car.orientation, current_time)
+        self.draw_road(car.orientation, current_time, self.height // 1.5)
+
         self._draw_img(
-            car.image, car.x * PIXELS_PER_METER, self.height // 1.5, -car.orientation
+            car.image, car.x * PIXELS_PER_METER, self.height // 1.5, -car.orientation 
         )
 
         pygame.display.flip()

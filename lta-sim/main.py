@@ -17,6 +17,12 @@ FPS = 60
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
 
+curve_amplitude = SCREEN_WIDTH // 12 / PIXELS_PER_METER 
+curve_frequency = 0.002  
+
+def road_curve(y):
+    """Calculate the horizontal offset of the road at a given y-coordinate."""
+    return int(curve_amplitude * np.sin(curve_frequency * (y + pygame.time.get_ticks() / 1000 * CAR_SPEED)))
 
 def setup_udp_socket(ip: str, port: int) -> tuple[socket.socket, tuple]:
     """Setup the UDP socket."""
@@ -86,7 +92,7 @@ def main() -> None:
         PIXELS_PER_METER,
         lanes,
     )
-    controller = Controller(0.2, 0.03, 0.1, np.pi / 3, np.pi / 3)
+    controller = Controller(0.2, 0.09, 0.1, np.pi / 3, np.pi / 3)
 
     sock, address = setup_udp_socket(UDP_IP, UDP_PORT)
     pygame.init()
@@ -94,6 +100,7 @@ def main() -> None:
     tick_count = 0
 
     while True:
+        center_line = (ui.current_lanes[2] + ui.current_lanes[1]) / 2 / PIXELS_PER_METER
         event = ui.event_handler()
         match event:
             case Event.QUIT:
@@ -106,6 +113,8 @@ def main() -> None:
                 tick_count = 0
             case Event.NO_EVENT:
                 u = np.array([CAR_SPEED, 0]).astype(np.float64)
+        
+        ui.draw(car)
 
         timestamp = time.time()
         dt = timestamp - prev_time
@@ -114,14 +123,16 @@ def main() -> None:
         # Disable controller if player is steering for 1/8s  
         if tick_count > FPS / 8:
             # PID to get target steering angle
-            target_phi = controller.compute_steering(car.x, center_line, dt)
+            target_phi = controller.compute_steering(car.x, center_line + road_curve(car.y), dt)
             
             # Feedforward to calculate target turn rate to reach target steering angleS
             u[1] = (target_phi - car.steering_angle) / dt
 
         # Calculate car dynamics
-        d_state = car.kinematics_model(u)
+        d_state = car.kinematics_model(u) 
         left_dist, right_dist = car.integrate_kinematics(d_state, dt)
+
+        car.lanes = ui.current_lanes / PIXELS_PER_METER
 
         publish_car_state(
             sock,
@@ -136,10 +147,7 @@ def main() -> None:
             controller,
         )
 
-        # Draw UI
-        ui.draw(car)
         tick_count += 1
-        car.lanes = np.array(ui.lanes) / PIXELS_PER_METER
 
     pygame.quit()
     sock.close()

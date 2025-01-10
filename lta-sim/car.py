@@ -5,7 +5,7 @@ import numpy as np
 class Car:
     def __init__(self, x: int, y: int, pixels_per_m: int, lanes: np.ndarray) -> None:
         self.image = pygame.image.load("car.png")
-        self.wheel_base = 2.9  # Wheelbase
+        self.wheel_base = 2.5  # Wheelbase
         self.state = np.array([x, y, np.pi / 2, 0.0])
         self.lanes = lanes
         self.pixels_per_m = pixels_per_m
