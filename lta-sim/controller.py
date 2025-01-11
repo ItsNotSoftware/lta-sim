@@ -1,16 +1,21 @@
 import time
-ti = time.time()
 
 class Controller:
-    def __init__(
-        self, kp: int, ki: int, kd: int, anti_windup: float, saturation: float
-    ) -> None:
+    """ PID controller for steering angle control. """
+    def __init__(self, kp: int, ki: int, kd: int) -> None:
+        """
+        Initialize the controller.
+
+        Args:
+            kp: The proportional gain.
+            ki: The integral gain.
+            kd: The derivative gain.
+        """
+
         # Gains
         self.kp = kp
         self.ki = ki
         self.kd = kd
-        self.anti_windup = anti_windup
-        self.saturation = saturation
 
         self.integral = 0
         self.prev_error = 0
@@ -36,9 +41,6 @@ class Controller:
         self.P = self.kp * error
         self.I = self.ki * self.integral
         self.D = self.kd * derivative
-
-        if abs(self.D) > 1:
-            print(time.time() - ti)
 
         # Compute raw control signal
         u = self.P + self.I + self.D

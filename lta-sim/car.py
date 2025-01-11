@@ -3,7 +3,17 @@ import numpy as np
 
 
 class Car:
+    """ A class to represent a car in the simulation using bycicle model. """
     def __init__(self, x: int, y: int, pixels_per_m: int, lanes: np.ndarray) -> None:
+        """
+        Initialize the car.
+
+        Args:
+            x: The x-coordinate of the car.
+            y: The y-coordinate of the car.
+            pixels_per_m: The number of ui pixels per simulation meter.
+            lanes: The x-coordinates of the lanes.
+        """
         self.image = pygame.image.load("car.png")
         self.wheel_base = 2.5  # Wheelbase
         self.state = np.array([x, y, np.pi / 2, 0.0])
@@ -29,12 +39,17 @@ class Car:
     def steering_angle(self) -> float:
         return self.state[3]
 
-    @staticmethod
-    def get_state_var(state: np.ndarray, var: str) -> float:
-        idx = ["x", "y", "theta", "v", "phi"].index(var)
-        return state[idx]
-
     def kinematics_model(self, u: np.ndarray) -> np.ndarray:
+        """
+        Compute the state derivative of the car using bycle model.
+
+        Args:
+            u: The control input to the car [v, ws].
+        
+        Returns:
+            The state derivative of the car.            
+        """
+
         A = np.array(
             [
                 [np.cos(self.orientation), 0],
@@ -46,9 +61,17 @@ class Car:
 
         return A @ u
 
-    def integrate_kinematics(
-        self, d_state: np.ndarray, dt: float
-    ) -> tuple[float, float]:
+    def integrate_kinematics(self, d_state: np.ndarray, dt: float) -> tuple[float, float]:
+        """
+        Integrate the kinematics of the car.
+
+        Args:
+            d_state: The state derivative of the car.
+            dt: The time step.
+
+        Returns:
+            A tuple containing the distance to the left and right lanes.
+        """  
         half_width = self.width / 2
         self.state += d_state * dt
 
@@ -66,11 +89,3 @@ class Car:
             right_dist = 0.0
 
         return float(-left_dist), float(right_dist)
-
-    def draw(self, screen: pygame.Surface) -> None:
-        rotated_image = pygame.transform.rotate(self.image, np.degrees(self.theta))
-        rect = rotated_image.get_rect(center=(self.x, self.y))
-        screen.blit(rotated_image, rect.topleft)
-
-    def set_velocity(self, v: float) -> None:
-        self.v = v

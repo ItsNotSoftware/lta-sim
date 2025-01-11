@@ -20,8 +20,17 @@ UDP_PORT = 5005
 DT = 1 / FPS
 
 
-def setup_udp_socket(ip: str, port: int) -> tuple[socket.socket, tuple]:
-    """Setup the UDP socket."""
+def setup_plotjuggler_socket(ip: str, port: int) -> tuple[socket.socket, tuple]:
+    """
+    Set up a UDP socket to send data to PlotJuggler(https://plotjuggler.io/).
+
+    Args:
+        ip: The IP address to send data to.
+        port: The port to send data to.
+    
+    Returns:
+        A tuple containing the socket and address.
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     address = (ip, port)
     return sock, address
@@ -39,15 +48,29 @@ def publish_car_state(
     car: Car,
     controller: Controller,
 ) -> None:
-    """Publish the car's state in JSON format."""
+    """
+    Publish the car state to PlotJuggler.
 
-    def to_serializable(value):
+    Args:
+        sock: The socket to send data.
+        address: The address to send data to.
+        timestamp: The timestamp of the data.
+        left_dist: The distance to the left lane.
+        right_dist: The distance to the right lane.
+        car_speed: The speed of the car.
+        turn_rate: The turn rate of the car.
+        target: The target steering angle.
+        car: The car object.
+        controller: The controller object.
+    """
+
+    def to_serializable(value: any) -> any:
         """Convert a value to a JSON-serializable Python type."""
         if isinstance(value, (np.integer, np.floating)):
-            return value.item()  # Convert numpy scalar to Python type
+            return value.item()  
         elif isinstance(value, np.ndarray):
-            return value.tolist()  # Convert numpy array to Python list
-        return value  # Return native Python types as-is
+            return value.tolist()  
+        return value  
 
     # Convert all values to JSON-serializable types
     data = {
@@ -78,12 +101,20 @@ def publish_car_state(
     sock.sendto(json_data.encode(), address)
 
 def process_cli_args() -> tuple[float, float]:
+    """ 
+    Process command line arguments. 
+    
+    Returns:
+        A tuple containing the amplitude and frequency of the road sine-wave.
+    """
     if len(sys.argv) == 3:
         return float(sys.argv[1]), float(sys.argv[2])
     else: 
         return 0.0, 0.0
 
 def main() -> None:
+    """Main function to run the simulation."""
+    # Init variables
     amplitude, freq = process_cli_args()   
     ui = UI(SCREEN_WIDTH, SCREEN_HEIGHT, CAR_SPEED, FPS, amplitude * PIXELS_PER_METER, freq)
     lanes = np.array(ui.lanes) / PIXELS_PER_METER
@@ -94,14 +125,18 @@ def main() -> None:
         PIXELS_PER_METER,
         lanes,
     )
-    controller = Controller(0.2, 0.09, 0.1, np.pi, 0.5)
-
-    sock, address = setup_udp_socket(UDP_IP, UDP_PORT)
+    controller = Controller(0.2, 0.09, 0.1,) # PID controller
+    sock, address = setup_plotjuggler_socket(UDP_IP, UDP_PORT)
     pygame.init()
+
     tick_count = 0
 
+    # Simulation loop
     while True:
+        # Compute center line for car to follow
         center_line = (ui.current_lanes[2] + ui.current_lanes[1]) / 2 / PIXELS_PER_METER
+
+        # Process user input
         event = ui.event_handler()
         match event:
             case Event.QUIT:
@@ -115,16 +150,13 @@ def main() -> None:
             case Event.NO_EVENT:
                 u = np.array([CAR_SPEED, 0]).astype(np.float64)
         
-        ui.draw(car)
-
-        timestamp = time.time()
 
         # Disable controller if player is steering for 1/8s  
         if tick_count > FPS / 8:
             # PID to get target steering angle
             target_phi = controller.compute_steering(car.x, center_line, DT)
             
-            # Feedforward to calculate target turn rate to reach target steering angleS
+            # Feedforward to calculate target turn rate to reach target steering angle
             u[1] = (target_phi - car.steering_angle) / DT
 
         # Calculate car dynamics
@@ -133,10 +165,11 @@ def main() -> None:
 
         car.lanes = ui.current_lanes / PIXELS_PER_METER
 
+        # Publish car state to PlotJuggler
         publish_car_state(
             sock,
             address,
-            timestamp * 1000,
+            time.time() * 1000,
             left_dist,
             right_dist,
             CAR_SPEED,
@@ -146,6 +179,8 @@ def main() -> None:
             controller,
         )
 
+        # Update UI
+        ui.draw(car)
         tick_count += 1
 
     pygame.quit()

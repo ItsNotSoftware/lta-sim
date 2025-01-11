@@ -10,14 +10,15 @@ DASH_GAP = 80
 
 
 class Event(Enum):
+    """An enumeration of possible events."""
     QUIT = auto()
     SW_LEFT = auto()
     SW_RIGHT = auto()
-    LOCK = auto()
     NO_EVENT = auto()
 
 
 class Color:
+    """A class to represent colors in RGB format."""
     WHITE = (255, 255, 255)
     BLACK = (0, 0, 0)
     GRASS = (0, 180, 0)
@@ -25,6 +26,7 @@ class Color:
 
 
 class UI:
+    """A class to represent the user interface of the simulation."""
     def __init__(
         self,
         width: int,
@@ -34,6 +36,17 @@ class UI:
         amplitude: float,
         freq: float,
     ) -> None:
+        """
+        Initialize the user interface.
+
+        Args:
+            width: The width of the window.
+            height: The height of the window.
+            speed: The speed of the car.
+            fps: The frames per second of the simulation.
+            amplitude: The amplitude of the road sine-wave.
+            freq: The frequency of the road sine-wave.
+        """ 
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((width, height))
         self.width = width
@@ -48,6 +61,15 @@ class UI:
 
     @staticmethod
     def init_lanes(width) -> np.ndarray:
+        """
+        Initialize the x-coordinates of the lanes.
+
+        Args:
+            width: The width of the window.
+        
+        Returns:
+            An array containing the x-coordinates of the lanes.
+        """
         grass_width = width // 6
         road_width = width - 2 * grass_width
         lane_width = road_width // 3
@@ -55,6 +77,14 @@ class UI:
         return np.array(lanes)
 
     def event_handler(self) -> Event:
+        """
+        Handle user input events.
+        
+        Returns:
+            The event that occurred.
+        """
+
+        # Key presses 
         keys = pygame.key.get_pressed()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -62,9 +92,8 @@ class UI:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q:
                     return Event.QUIT
-                if event.key == pygame.K_l:
-                    return Event.LOCK
 
+        # Key holds
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             return Event.SW_LEFT
         elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
@@ -75,12 +104,29 @@ class UI:
     def _draw_img(
         self, img: pygame.Surface, x: int, y: int, orientation: float
     ) -> None:
+        """
+        Draw an image on the screen with a given orientation.
+        
+        Args:
+            img: The image to draw.
+            x: The x-coordinate of the image.
+            y: The y-coordinate of the image.
+            orientation: The orientation of the image.
+        """
         rotated_img = pygame.transform.rotate(img, -np.degrees(orientation))
         rect = rotated_img.get_rect(center=(x, y))
         self.screen.blit(rotated_img, rect.topleft)
 
     def draw_road(self, theta: float, time: float, car_y: int) -> None:
-        # Draw grass on both sides
+        """
+        Draw the road with lane dividers and boundaries.
+
+        Args:
+            theta: The angle of the road.
+            time: The current time.
+            car_y: The y-coordinate of the car.
+        """
+        # Draw grass on both sides (its not grass anymore but keep the name to not break the code)
         grass_width = self.width // 6
         pygame.draw.rect(self.screen, Color.ROAD, (0, 0, grass_width, self.height))
         pygame.draw.rect(
@@ -142,6 +188,12 @@ class UI:
         self.current_lanes = self.lanes + road_curve(car_y)
 
     def draw(self, car: Car) -> None:
+        """
+        Draw the car and the road on the screen.
+
+        Args:
+            car: The car to draw.
+        """
         current_time = pygame.time.get_ticks() / 1000  # Get time in seconds
         self.draw_road(car.orientation, current_time, self.height // 1.5)
 
