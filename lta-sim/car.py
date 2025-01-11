@@ -3,7 +3,8 @@ import numpy as np
 
 
 class Car:
-    """ A class to represent a car in the simulation using bycicle model. """
+    """A class to represent a car in the simulation using bycicle model."""
+
     def __init__(self, x: int, y: int, pixels_per_m: int, lanes: np.ndarray) -> None:
         """
         Initialize the car.
@@ -14,7 +15,12 @@ class Car:
             pixels_per_m: The number of ui pixels per simulation meter.
             lanes: The x-coordinates of the lanes.
         """
-        self.image = pygame.image.load("car.png")
+        # Load car image (try-except block for loading even if main is run from a different directory)
+        try:
+            self.image = pygame.image.load("car.png")
+        except FileNotFoundError:
+            self.image = pygame.image.load("lta-sim/car.png")
+
         self.wheel_base = 2.5  # Wheelbase
         self.state = np.array([x, y, np.pi / 2, 0.0])
         self.lanes = lanes
@@ -45,9 +51,9 @@ class Car:
 
         Args:
             u: The control input to the car [v, ws].
-        
+
         Returns:
-            The state derivative of the car.            
+            The state derivative of the car.
         """
 
         A = np.array(
@@ -61,7 +67,9 @@ class Car:
 
         return A @ u
 
-    def integrate_kinematics(self, d_state: np.ndarray, dt: float) -> tuple[float, float]:
+    def integrate_kinematics(
+        self, d_state: np.ndarray, dt: float
+    ) -> tuple[float, float]:
         """
         Integrate the kinematics of the car.
 
@@ -71,7 +79,7 @@ class Car:
 
         Returns:
             A tuple containing the distance to the left and right lanes.
-        """  
+        """
         half_width = self.width / 2
         self.state += d_state * dt
 

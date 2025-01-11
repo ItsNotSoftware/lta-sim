@@ -11,14 +11,17 @@ DASH_GAP = 80
 
 class Event(Enum):
     """An enumeration of possible events."""
+
     QUIT = auto()
     SW_LEFT = auto()
     SW_RIGHT = auto()
+    TOGGLE_CONTROL = auto()
     NO_EVENT = auto()
 
 
 class Color:
     """A class to represent colors in RGB format."""
+
     WHITE = (255, 255, 255)
     BLACK = (0, 0, 0)
     GRASS = (0, 180, 0)
@@ -27,6 +30,7 @@ class Color:
 
 class UI:
     """A class to represent the user interface of the simulation."""
+
     def __init__(
         self,
         width: int,
@@ -46,7 +50,7 @@ class UI:
             fps: The frames per second of the simulation.
             amplitude: The amplitude of the road sine-wave.
             freq: The frequency of the road sine-wave.
-        """ 
+        """
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((width, height))
         self.width = width
@@ -66,7 +70,7 @@ class UI:
 
         Args:
             width: The width of the window.
-        
+
         Returns:
             An array containing the x-coordinates of the lanes.
         """
@@ -79,12 +83,12 @@ class UI:
     def event_handler(self) -> Event:
         """
         Handle user input events.
-        
+
         Returns:
             The event that occurred.
         """
 
-        # Key presses 
+        # Key presses
         keys = pygame.key.get_pressed()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -92,6 +96,8 @@ class UI:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q:
                     return Event.QUIT
+                elif event.key == pygame.K_SPACE:
+                    return Event.TOGGLE_CONTROL
 
         # Key holds
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -106,7 +112,7 @@ class UI:
     ) -> None:
         """
         Draw an image on the screen with a given orientation.
-        
+
         Args:
             img: The image to draw.
             x: The x-coordinate of the image.

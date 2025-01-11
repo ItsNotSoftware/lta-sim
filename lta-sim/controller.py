@@ -1,7 +1,6 @@
-import time
-
 class Controller:
-    """ PID controller for steering angle control. """
+    """PID controller for steering angle control."""
+
     def __init__(self, kp: int, ki: int, kd: int) -> None:
         """
         Initialize the controller.
@@ -11,7 +10,6 @@ class Controller:
             ki: The integral gain.
             kd: The derivative gain.
         """
-
         # Gains
         self.kp = kp
         self.ki = ki
