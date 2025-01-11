@@ -4,25 +4,21 @@ from controller import Controller
 
 import numpy as np
 import pygame
+import time
 import socket
 import json
-import time
+import sys 
 
 # Constants
 SCREEN_WIDTH = 1400
 SCREEN_HEIGHT = 1600
-CAR_SPEED = 10  # m/s
+CAR_SPEED = 15  # m/s
 SW_TURN_SPEED = np.pi / 4  # rad/s
 FPS = 60
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
+DT = 1 / FPS
 
-curve_amplitude = SCREEN_WIDTH // 12 / PIXELS_PER_METER 
-curve_frequency = 0.002  
-
-def road_curve(y):
-    """Calculate the horizontal offset of the road at a given y-coordinate."""
-    return int(curve_amplitude * np.sin(curve_frequency * (y + pygame.time.get_ticks() / 1000 * CAR_SPEED)))
 
 def setup_udp_socket(ip: str, port: int) -> tuple[socket.socket, tuple]:
     """Setup the UDP socket."""
@@ -81,22 +77,27 @@ def publish_car_state(
     json_data = json.dumps(data)
     sock.sendto(json_data.encode(), address)
 
+def process_cli_args() -> tuple[float, float]:
+    if len(sys.argv) == 3:
+        return float(sys.argv[1]), float(sys.argv[2])
+    else: 
+        return 0.0, 0.0
 
 def main() -> None:
-    ui = UI(SCREEN_WIDTH, SCREEN_HEIGHT, CAR_SPEED, FPS)
+    amplitude, freq = process_cli_args()   
+    ui = UI(SCREEN_WIDTH, SCREEN_HEIGHT, CAR_SPEED, FPS, amplitude * PIXELS_PER_METER, freq)
     lanes = np.array(ui.lanes) / PIXELS_PER_METER
-    center_line = (lanes[2] + lanes[1]) / 2
+    center_line = (lanes[2] + lanes[1]) / 2 
     car = Car(
         SCREEN_WIDTH / (2 * PIXELS_PER_METER),
         SCREEN_HEIGHT / (2 * PIXELS_PER_METER),
         PIXELS_PER_METER,
         lanes,
     )
-    controller = Controller(0.2, 0.09, 0.1, np.pi / 3, np.pi / 3)
+    controller = Controller(0.2, 0.09, 0.1, np.pi, 0.5)
 
     sock, address = setup_udp_socket(UDP_IP, UDP_PORT)
     pygame.init()
-    prev_time = time.time()
     tick_count = 0
 
     while True:
@@ -117,20 +118,18 @@ def main() -> None:
         ui.draw(car)
 
         timestamp = time.time()
-        dt = timestamp - prev_time
-        prev_time = timestamp
 
         # Disable controller if player is steering for 1/8s  
         if tick_count > FPS / 8:
             # PID to get target steering angle
-            target_phi = controller.compute_steering(car.x, center_line + road_curve(car.y), dt)
+            target_phi = controller.compute_steering(car.x, center_line, DT)
             
             # Feedforward to calculate target turn rate to reach target steering angleS
-            u[1] = (target_phi - car.steering_angle) / dt
+            u[1] = (target_phi - car.steering_angle) / DT
 
         # Calculate car dynamics
         d_state = car.kinematics_model(u) 
-        left_dist, right_dist = car.integrate_kinematics(d_state, dt)
+        left_dist, right_dist = car.integrate_kinematics(d_state, DT)
 
         car.lanes = ui.current_lanes / PIXELS_PER_METER
 

@@ -25,7 +25,15 @@ class Color:
 
 
 class UI:
-    def __init__(self, width: int, height: int, speed: int, fps: int) -> None:
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        speed: int,
+        fps: int,
+        amplitude: float,
+        freq: float,
+    ) -> None:
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((width, height))
         self.width = width
@@ -35,6 +43,8 @@ class UI:
         self.lanes = self.init_lanes(width)
         self.current_lanes = self.lanes
         self.dash_offset = 0
+        self.amplitude = amplitude
+        self.freq = freq
 
     @staticmethod
     def init_lanes(width) -> np.ndarray:
@@ -92,13 +102,9 @@ class UI:
         # Loop offset to keep it wiFthin one dash cycle
         self.dash_offset %= total_dash_height
 
-        # Define the sinusoidal curve effect
-        curve_amplitude = grass_width // 2.2  # Maximum horizontal deviation for the curve
-        curve_frequency = 0.001  # Controls the density of curves
-
         def road_curve(y):
             """Calculate the horizontal offset of the road at a given y-coordinate."""
-            return int(curve_amplitude * np.sin(curve_frequency * (y + time * self.speed)))
+            return int(self.amplitude * np.sin(self.freq * (y + time * self.speed)))
 
         # Draw lane dividers (dashed lines) with sinusoidal curves
         for x in self.lanes[1:-1]:
@@ -133,17 +139,15 @@ class UI:
                     (right_x + 1, y),
                     LANE_WIDTH,
                 )
-        self.current_lanes = self.lanes + road_curve(car_y) 
-        
+        self.current_lanes = self.lanes + road_curve(car_y)
 
     def draw(self, car: Car) -> None:
         current_time = pygame.time.get_ticks() / 1000  # Get time in seconds
         self.draw_road(car.orientation, current_time, self.height // 1.5)
 
         self._draw_img(
-            car.image, car.x * PIXELS_PER_METER, self.height // 1.5, -car.orientation 
+            car.image, car.x * PIXELS_PER_METER, self.height // 1.5, -car.orientation
         )
 
         pygame.display.flip()
         self.clock.tick(self.fps)
-

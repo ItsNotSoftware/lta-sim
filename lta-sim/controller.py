@@ -1,5 +1,5 @@
-import numpy as np
-
+import time
+ti = time.time()
 
 class Controller:
     def __init__(
@@ -22,17 +22,27 @@ class Controller:
         self.u = 0
 
     def compute_steering(self, target: float, current: float, dt: float) -> float:
+        # Calculate error
         error = target - current
-        self.integral += error * dt
-        self.integral = np.clip(self.integral, -self.anti_windup, self.anti_windup)
 
+        # Compute integral term with anti-windup
+        self.integral += error * dt
+
+        # Compute derivative term
         derivative = (error - self.prev_error) / dt
         self.prev_error = error
 
+        # Compute PID terms
         self.P = self.kp * error
         self.I = self.ki * self.integral
         self.D = self.kd * derivative
 
+        if abs(self.D) > 1:
+            print(time.time() - ti)
+
+        # Compute raw control signal
         u = self.P + self.I + self.D
+
         self.u = u
+
         return u
