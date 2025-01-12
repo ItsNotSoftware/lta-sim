@@ -130,7 +130,7 @@ def main() -> None:
     )
     controller = Controller(
         0.2,
-        0.09,
+        0.01,
         0.1,
     )  # PID controller
     sock, address = setup_plotjuggler_socket(UDP_IP, UDP_PORT)
